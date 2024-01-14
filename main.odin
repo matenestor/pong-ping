@@ -1,17 +1,18 @@
 package pongping
 
 import "core:fmt"
+import "core:strings"
 import rl "vendor:raylib"
 
 FPS :: 60
 WIDTH :: 800
-HEIGHT :: 450
+HEIGHT :: 500
 BG :: 0x20
 
 BAT_W :: 20
 BAT_H :: 80
 BAT_SPEED :: 100
-BAT_OFFSET :: 0.05
+BAT_OFFSET :: 0.03
 BALL_SPEED_X :: 160
 BALL_SPEED_Y :: 4
 BALL_RADIUS :: 10
@@ -39,16 +40,25 @@ main :: proc() {
 	dir_bat_right := rl.Vector2{0, BAT_SPEED * -1}
 
 	dt: f32 = 0
+	lives, score: int = 3, 0
+	str_lives, str_score := "", ""
+	game_over := false
 
 	rl.InitWindow(WIDTH, HEIGHT, "Pong Ping game")
 	rl.SetTargetFPS(FPS)
 	rl.SetExitKey(rl.KeyboardKey.CAPS_LOCK)
 
-    for !rl.WindowShouldClose() {
+	for !rl.WindowShouldClose() {
 		dt = rl.GetFrameTime()
 
-        rl.BeginDrawing()
-            rl.ClearBackground({BG, BG, BG, 0xff})
+		rl.BeginDrawing()
+			rl.ClearBackground({BG, BG, BG, 0xff})
+
+			if game_over {
+				rl.DrawText("GAME OVER", WIDTH / 2 - 70, HEIGHT / 2 - 30, 24, rl.BLUE)
+				rl.EndDrawing()
+				continue
+			}
 
 			// getting input
 			if rl.IsKeyDown(rl.KeyboardKey.J) || rl.IsKeyDown(rl.KeyboardKey.S) {
@@ -63,15 +73,31 @@ main :: proc() {
 			}
 
 			// out of bounds checks
-			if pos.x < 0 || pos.x > WIDTH { dir.x *= -1 }
-			if pos.y < 0 || pos.y > HEIGHT { dir.y *= -1 }
+			if pos.y - BALL_RADIUS < 0 || pos.y + BALL_RADIUS > HEIGHT { dir.y *= -1 }
 			if bat_left.y  < 0 || bat_left.y  > (HEIGHT - BAT_H) { dir_bat_left.y *= -1 }
 			if bat_right.y < 0 || bat_right.y > (HEIGHT - BAT_H) { dir_bat_right.y *= -1 }
 
 			// ball and bat collision
 			if rl.CheckCollisionCircleRec(pos, BALL_RADIUS, bat_left) \
 			|| rl.CheckCollisionCircleRec(pos, BALL_RADIUS, bat_right) {
+				// FIXME glitching when the collision is from top/bottom
 				dir.x *= -1
+				score += 100
+			}
+
+			// ball and the edge collision
+			if pos.x < 0 || pos.x > WIDTH {
+				if lives > 0 {
+					lives -= 1
+					pos = {WIDTH / 2, HEIGHT / 2}
+					dir = {100, 0}
+				}
+				else {
+					dir = {0, 0}
+					dir_bat_left = {0, 0}
+					dir_bat_right = {0, 0}
+					game_over = true
+				}
 			}
 
 			// rendering
@@ -83,10 +109,14 @@ main :: proc() {
 			bat_right.y += dir_bat_right.y * dt
 			rl.DrawRectangleRec(bat_left, rl.RAYWHITE)
 			rl.DrawRectangleRec(bat_right, rl.RAYWHITE)
-        rl.EndDrawing()
 
-		fmt.println(dir)
-    }
-    rl.CloseWindow()
+			// draw text
+			str_lives = fmt.tprintf("lives: %d", lives)
+			str_score = fmt.tprintf("score: %d", score)
+			rl.DrawText(strings.unsafe_string_to_cstring(str_lives), 80, 20, 24, rl.BLUE)
+			rl.DrawText(strings.unsafe_string_to_cstring(str_score), WIDTH / 2 - 50, 20, 24, rl.BLUE)
+		rl.EndDrawing()
+	}
+	rl.CloseWindow()
 }
 
