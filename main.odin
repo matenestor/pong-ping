@@ -7,13 +7,38 @@ FPS :: 60
 WIDTH :: 800
 HEIGHT :: 450
 BG :: 0x20
-Vector2 :: struct {x, y: f32}
+
+BAT_W :: 20
+BAT_H :: 80
+BAT_SPEED :: 100
+BAT_OFFSET :: 0.05
+BALL_SPEED_X :: 160
+BALL_SPEED_Y :: 4
+BALL_RADIUS :: 10
 
 main :: proc() {
-	pos: Vector2 = {WIDTH / 2, HEIGHT / 2}
-	dir: Vector2 = {100, 0}
-	velocity: f32 = 3
+	// ball
+	pos: rl.Vector2 = {WIDTH / 2, HEIGHT / 2}
+	dir: rl.Vector2 = {100, 0}
+
+	// bats
+	bat_left := rl.Rectangle{
+		WIDTH * BAT_OFFSET,
+		HEIGHT * BAT_OFFSET,
+		BAT_W,
+		BAT_H
+	}
+	bat_right := rl.Rectangle{
+		WIDTH * (1 - BAT_OFFSET) - BAT_W,
+		HEIGHT * (1 - BAT_OFFSET) - BAT_H,
+		BAT_W,
+		BAT_H
+	}
+	dir_bat_left := rl.Vector2{0, BAT_SPEED}
+	dir_bat_right := rl.Vector2{0, BAT_SPEED * -1}
+
 	dt: f32 = 0
+	cl, cr: rl.Color = rl.RAYWHITE, rl.RAYWHITE
 
 	rl.InitWindow(WIDTH, HEIGHT, "Pong Ping game")
 	rl.SetTargetFPS(FPS)
@@ -26,35 +51,34 @@ main :: proc() {
             rl.ClearBackground({BG, BG, BG, 0xff})
 
 			// getting input
-			if      rl.IsKeyDown(rl.KeyboardKey.J) { dir.y += velocity }
-			else if rl.IsKeyDown(rl.KeyboardKey.K) { dir.y -= velocity }
+			if      rl.IsKeyDown(rl.KeyboardKey.J) { dir.y += BALL_SPEED_Y }
+			else if rl.IsKeyDown(rl.KeyboardKey.K) { dir.y -= BALL_SPEED_Y }
 
 			// out of bounds checks
-			if pos.x > WIDTH || pos.x < 0 { dir.x *= -1 }
-			if pos.y > HEIGHT || pos.y < 0 { dir.y *= -1 }
+			if pos.x < 0 || pos.x > WIDTH { dir.x *= -1 }
+			if pos.y < 0 || pos.y > HEIGHT { dir.y *= -1 }
+			if bat_left.y  < 0 || bat_left.y  > (HEIGHT - BAT_H) { dir_bat_left.y *= -1 }
+			if bat_right.y < 0 || bat_right.y > (HEIGHT - BAT_H) { dir_bat_right.y *= -1 }
+
+			// ball and bat collision
+			if rl.CheckCollisionCircleRec(pos, BALL_RADIUS, bat_left) {
+				cl = rl.RED
+			} else { cl = rl.RAYWHITE }
+			if rl.CheckCollisionCircleRec(pos, BALL_RADIUS, bat_right) {
+				cr = rl.RED
+			} else { cr = rl.RAYWHITE }
 
 			// rendering
-			pos.x = pos.x + dir.x * dt
-			pos.y = pos.y + dir.y * dt
-			rl.DrawCircle(i32(pos.x), i32(pos.y), 10, rl.RAYWHITE)
+			pos.x += dir.x * dt
+			pos.y += dir.y * dt
+			rl.DrawCircleV(pos, BALL_RADIUS, rl.RAYWHITE)
 
+			bat_left.y += dir_bat_left.y * dt
+			bat_right.y += dir_bat_right.y * dt
+			rl.DrawRectangleRec(bat_left, cl)
+			rl.DrawRectangleRec(bat_right, cr)
         rl.EndDrawing()
     }
     rl.CloseWindow()
 }
-
-/*
-72 h
-74 j
-75 k
-76 l
-265 ^
-263 <
-264 v
-262 >
-87 w
-65 a
-83 s
-68 d
-*/
 
