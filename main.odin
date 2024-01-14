@@ -38,7 +38,6 @@ main :: proc() {
 	dir_bat_right := rl.Vector2{0, BAT_SPEED * -1}
 
 	dt: f32 = 0
-	cl, cr: rl.Color = rl.RAYWHITE, rl.RAYWHITE
 
 	rl.InitWindow(WIDTH, HEIGHT, "Pong Ping game")
 	rl.SetTargetFPS(FPS)
@@ -61,12 +60,10 @@ main :: proc() {
 			if bat_right.y < 0 || bat_right.y > (HEIGHT - BAT_H) { dir_bat_right.y *= -1 }
 
 			// ball and bat collision
-			if rl.CheckCollisionCircleRec(pos, BALL_RADIUS, bat_left) {
-				cl = rl.RED
-			} else { cl = rl.RAYWHITE }
-			if rl.CheckCollisionCircleRec(pos, BALL_RADIUS, bat_right) {
-				cr = rl.RED
-			} else { cr = rl.RAYWHITE }
+			if rl.CheckCollisionCircleRec(pos, BALL_RADIUS, bat_left) \
+			|| rl.CheckCollisionCircleRec(pos, BALL_RADIUS, bat_right) {
+				dir.x *= -1
+			}
 
 			// rendering
 			pos.x += dir.x * dt
@@ -75,9 +72,11 @@ main :: proc() {
 
 			bat_left.y += dir_bat_left.y * dt
 			bat_right.y += dir_bat_right.y * dt
-			rl.DrawRectangleRec(bat_left, cl)
-			rl.DrawRectangleRec(bat_right, cr)
+			rl.DrawRectangleRec(bat_left, rl.RAYWHITE)
+			rl.DrawRectangleRec(bat_right, rl.RAYWHITE)
         rl.EndDrawing()
+
+		fmt.println(dir)
     }
     rl.CloseWindow()
 }
