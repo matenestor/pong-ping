@@ -15,6 +15,7 @@ BAT_OFFSET :: 0.05
 BALL_SPEED_X :: 160
 BALL_SPEED_Y :: 4
 BALL_RADIUS :: 10
+BALL_TOP_SPEED :: 600
 
 main :: proc() {
 	// ball
@@ -50,8 +51,16 @@ main :: proc() {
             rl.ClearBackground({BG, BG, BG, 0xff})
 
 			// getting input
-			if      rl.IsKeyDown(rl.KeyboardKey.J) { dir.y += BALL_SPEED_Y }
-			else if rl.IsKeyDown(rl.KeyboardKey.K) { dir.y -= BALL_SPEED_Y }
+			if rl.IsKeyDown(rl.KeyboardKey.J) || rl.IsKeyDown(rl.KeyboardKey.S) {
+				dir.y += BALL_SPEED_Y
+			}
+			else if rl.IsKeyDown(rl.KeyboardKey.K) || rl.IsKeyDown(rl.KeyboardKey.W) {
+				dir.y -= BALL_SPEED_Y
+			}
+			if abs(dir.y) > BALL_TOP_SPEED {
+				sign := dir.y / abs(dir.y)
+				dir.y = sign * BALL_TOP_SPEED
+			}
 
 			// out of bounds checks
 			if pos.x < 0 || pos.x > WIDTH { dir.x *= -1 }
