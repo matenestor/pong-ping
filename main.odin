@@ -18,9 +18,12 @@ BALL_SPEED_Y :: 4
 BALL_RADIUS :: 10
 BALL_TOP_SPEED :: 600
 
+// TODO refactor to procs
 main :: proc() {
+	// TODO create one entity struct for the ball and the bats
 	// ball
 	pos: rl.Vector2 = {WIDTH / 2, HEIGHT / 2}
+	// TODO start with random direction (y: +-angle)
 	dir: rl.Vector2 = {100, 0}
 
 	// bats
@@ -72,17 +75,58 @@ main :: proc() {
 				dir.y = sign * BALL_TOP_SPEED
 			}
 
-			// out of bounds checks
+			// out of bounds checks on y-axis for the ball and the bats
 			if pos.y - BALL_RADIUS < 0 || pos.y + BALL_RADIUS > HEIGHT { dir.y *= -1 }
 			if bat_left.y  < 0 || bat_left.y  > (HEIGHT - BAT_H) { dir_bat_left.y *= -1 }
 			if bat_right.y < 0 || bat_right.y > (HEIGHT - BAT_H) { dir_bat_right.y *= -1 }
 
 			// ball and bat collision
-			if rl.CheckCollisionCircleRec(pos, BALL_RADIUS, bat_left) \
-			|| rl.CheckCollisionCircleRec(pos, BALL_RADIUS, bat_right) {
-				// FIXME glitching when the collision is from top/bottom
-				dir.x *= -1
-				score += 100
+			if rl.CheckCollisionCircleRec(pos, BALL_RADIUS, bat_right) {
+				if pos.x < bat_right.x {
+					score += 100
+
+					dir.x *= -1
+					// side collision correction
+					pos.x = bat_right.x - BALL_RADIUS - 1
+
+					// NOTE: It is also possible to calculate the corrected postion like
+					// this, maybe it's more intuitive, but it requires more operations:
+					//   pos.x -= BALL_RADIUS - abs(pos.x - bat_right.x) + 1
+					//
+					// The same with pos.y:
+					//   top: pos.y -= BALL_RADIUS - abs(pos.y - bat_right.y) + 1
+					//   btm: pos.y += BALL_RADIUS - abs(pos.y - (bat_right.y + bat_right.height)) + 1
+				}
+				else {
+					dir.y *= -1
+
+					if pos.y < bat_right.y {
+						// top collision correction
+						pos.y = bat_right.y - BALL_RADIUS - 1
+					}
+					else {
+						// bottom collision correction
+						pos.y = bat_right.y + bat_right.height + BALL_RADIUS + 1
+					}
+				}
+			}
+			else if rl.CheckCollisionCircleRec(pos, BALL_RADIUS, bat_left) {
+				if pos.x > bat_left.x + bat_left.width {
+					score += 100
+
+					dir.x *= -1
+					pos.x = bat_left.x + bat_left.width + BALL_RADIUS + 1
+				}
+				else {
+					dir.y *= -1
+
+					if pos.y < bat_left.y {
+						pos.y = bat_left.y - BALL_RADIUS - 1
+					}
+					else {
+						pos.y = bat_left.y + bat_left.height + BALL_RADIUS + 1
+					}
+				}
 			}
 
 			// ball and the edge collision
@@ -100,13 +144,15 @@ main :: proc() {
 				}
 			}
 
-			// rendering
+
+			// update physics
 			pos.x += dir.x * dt
 			pos.y += dir.y * dt
-			rl.DrawCircleV(pos, BALL_RADIUS, rl.RAYWHITE)
-
 			bat_left.y += dir_bat_left.y * dt
 			bat_right.y += dir_bat_right.y * dt
+
+			// rendering
+			rl.DrawCircleV(pos, BALL_RADIUS, rl.RAYWHITE)
 			rl.DrawRectangleRec(bat_left, rl.RAYWHITE)
 			rl.DrawRectangleRec(bat_right, rl.RAYWHITE)
 
