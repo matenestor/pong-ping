@@ -5,7 +5,6 @@ import "core:strings"
 import rl "vendor:raylib"
 
 // TODO increase bat speed randomly on hit?
-// TODO increase momentum on hit and decrease it progressively
 
 FPS :: 60
 WIDTH :: 800
@@ -13,13 +12,17 @@ HEIGHT :: 500
 BG :: 0x20
 
 BAT_W :: 20
-BAT_H :: 80
+BAT_H :: 100
 BAT_SPEED :: 100
 BAT_OFFSET :: 0.03
 BALL_SPEED_X :: 100
 BALL_SPEED_Y :: 3
 BALL_RADIUS :: 10
 BALL_TOP_SPEED :: 600
+
+sign :: #force_inline proc(num: f32) -> f32 {
+	return num / abs(num)
+}
 
 // TODO refactor to procs
 main :: proc() {
@@ -48,6 +51,7 @@ main :: proc() {
 	dt: f32 = 0
 	lives, score: int = 3, 0
 	ball_speed_change: f32 = BALL_SPEED_Y
+	momentum: f32 = -0.1  // not 0, because of the division in sign()
 	str_lives, str_score := "", ""
 	game_over := false
 
@@ -92,8 +96,7 @@ main :: proc() {
 				dir.y -= ball_speed_change
 			}
 			if abs(dir.y) > BALL_TOP_SPEED {
-				sign := dir.y / abs(dir.y)
-				dir.y = sign * BALL_TOP_SPEED
+				dir.y = sign(dir.y) * BALL_TOP_SPEED
 			}
 
 			// out of bounds checks on y-axis for the ball and the bats
@@ -113,6 +116,7 @@ main :: proc() {
 					}
 
 					dir.x *= -1
+					momentum = BALL_SPEED_X
 					// side collision correction
 					pos.x = bat_right.x - BALL_RADIUS - 1
 
@@ -148,6 +152,7 @@ main :: proc() {
 					}
 
 					dir.x *= -1
+					momentum = BALL_SPEED_X
 					pos.x = bat_left.x + bat_left.width + BALL_RADIUS + 1
 				}
 				else {
@@ -169,6 +174,7 @@ main :: proc() {
 					pos = {WIDTH / 2, HEIGHT / 2}
 					dir = {BALL_SPEED_X, 0}
 					ball_speed_change = BALL_SPEED_Y
+					momentum = -0.1
 				}
 				else {
 					dir = {0, 0}
@@ -180,7 +186,8 @@ main :: proc() {
 
 
 			// update physics
-			pos.x += dir.x * dt
+			if momentum > 0 do momentum -= 2 * BALL_SPEED_X * dt
+			pos.x += (dir.x + sign(dir.x) * momentum) * dt
 			pos.y += dir.y * dt
 			bat_left.y += dir_bat_left.y * dt
 			bat_right.y += dir_bat_right.y * dt
