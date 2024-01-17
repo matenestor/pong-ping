@@ -49,7 +49,12 @@ main :: proc() {
 
 	rl.InitWindow(WIDTH, HEIGHT, "Pong Ping game")
 	rl.SetTargetFPS(FPS)
+	// my Escape is remaped to CapsLock, but Raylib ignores it
 	rl.SetExitKey(rl.KeyboardKey.CAPS_LOCK)
+
+	STRLEN_GAMEOVER := rl.MeasureText("GAME OVER", 32) / 2
+	STRLEN_PLAYAGAIN := rl.MeasureText("Press Space to play again", 20) / 2
+	STRLEN_SCORE := rl.MeasureText("Score: 0000", 24) / 2
 
 	for !rl.WindowShouldClose() {
 		dt = rl.GetFrameTime()
@@ -58,7 +63,18 @@ main :: proc() {
 			rl.ClearBackground({BG, BG, BG, 0xff})
 
 			if game_over {
-				rl.DrawText("GAME OVER", WIDTH / 2 - 70, HEIGHT / 2 - 30, 24, rl.BLUE)
+				rl.DrawText("GAME OVER", WIDTH / 2 - STRLEN_GAMEOVER, HEIGHT / 2 - 30, 32, rl.BLUE)
+				rl.DrawText("Press Space to play again", WIDTH / 2 - STRLEN_PLAYAGAIN, HEIGHT / 2 + 20, 20, rl.BLUE)
+
+				if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
+					pos = {WIDTH / 2, HEIGHT / 2}
+					dir = {100, 0}
+					dir_bat_left = {0, BAT_SPEED}
+					dir_bat_right = {0, BAT_SPEED * -1}
+					lives = 3
+					game_over = false
+				}
+
 				rl.EndDrawing()
 				continue
 			}
@@ -157,10 +173,10 @@ main :: proc() {
 			rl.DrawRectangleRec(bat_right, rl.RAYWHITE)
 
 			// draw text
-			str_lives = fmt.tprintf("lives: %d", lives)
-			str_score = fmt.tprintf("score: %d", score)
-			rl.DrawText(strings.unsafe_string_to_cstring(str_lives), 80, 20, 24, rl.BLUE)
-			rl.DrawText(strings.unsafe_string_to_cstring(str_score), WIDTH / 2 - 50, 20, 24, rl.BLUE)
+			str_lives = fmt.tprintf("Lives: %d", lives)
+			str_score = fmt.tprintf("Score: %d", score)
+			rl.DrawText(strings.unsafe_string_to_cstring(str_lives), WIDTH * 0.1, 20, 24, rl.BLUE)
+			rl.DrawText(strings.unsafe_string_to_cstring(str_score), WIDTH / 2 - STRLEN_SCORE, 20, 24, rl.BLUE)
 		rl.EndDrawing()
 	}
 	rl.CloseWindow()
