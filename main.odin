@@ -4,6 +4,9 @@ import "core:fmt"
 import "core:strings"
 import rl "vendor:raylib"
 
+// TODO increase bat speed randomly on hit?
+// TODO increase momentum on hit and decrease it progressively
+
 FPS :: 60
 WIDTH :: 800
 HEIGHT :: 500
@@ -13,8 +16,8 @@ BAT_W :: 20
 BAT_H :: 80
 BAT_SPEED :: 100
 BAT_OFFSET :: 0.03
-BALL_SPEED_X :: 160
-BALL_SPEED_Y :: 4
+BALL_SPEED_X :: 100
+BALL_SPEED_Y :: 3
 BALL_RADIUS :: 10
 BALL_TOP_SPEED :: 600
 
@@ -24,7 +27,7 @@ main :: proc() {
 	// ball
 	pos: rl.Vector2 = {WIDTH / 2, HEIGHT / 2}
 	// TODO start with random direction (y: +-angle)
-	dir: rl.Vector2 = {100, 0}
+	dir: rl.Vector2 = {BALL_SPEED_X, 0}
 
 	// bats
 	bat_left := rl.Rectangle{
@@ -44,6 +47,7 @@ main :: proc() {
 
 	dt: f32 = 0
 	lives, score: int = 3, 0
+	ball_speed_change: f32 = BALL_SPEED_Y
 	str_lives, str_score := "", ""
 	game_over := false
 
@@ -68,9 +72,10 @@ main :: proc() {
 
 				if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
 					pos = {WIDTH / 2, HEIGHT / 2}
-					dir = {100, 0}
+					dir = {BALL_SPEED_X, 0}
 					dir_bat_left = {0, BAT_SPEED}
 					dir_bat_right = {0, BAT_SPEED * -1}
+					ball_speed_change = BALL_SPEED_Y
 					lives = 3
 					game_over = false
 				}
@@ -81,10 +86,10 @@ main :: proc() {
 
 			// getting input
 			if rl.IsKeyDown(rl.KeyboardKey.J) || rl.IsKeyDown(rl.KeyboardKey.S) {
-				dir.y += BALL_SPEED_Y
+				dir.y += ball_speed_change
 			}
 			else if rl.IsKeyDown(rl.KeyboardKey.K) || rl.IsKeyDown(rl.KeyboardKey.W) {
-				dir.y -= BALL_SPEED_Y
+				dir.y -= ball_speed_change
 			}
 			if abs(dir.y) > BALL_TOP_SPEED {
 				sign := dir.y / abs(dir.y)
@@ -100,6 +105,12 @@ main :: proc() {
 			if rl.CheckCollisionCircleRec(pos, BALL_RADIUS, bat_right) {
 				if pos.x < bat_right.x {
 					score += 100
+
+					// increase the ball speed every second hit
+					if score % 200 == 0 {
+						dir.x += 20
+						ball_speed_change += 1
+					}
 
 					dir.x *= -1
 					// side collision correction
@@ -130,6 +141,12 @@ main :: proc() {
 				if pos.x > bat_left.x + bat_left.width {
 					score += 100
 
+					// increase the ball speed every second hit
+					if score % 200 == 0 {
+						dir.x -= 20
+						ball_speed_change += 1
+					}
+
 					dir.x *= -1
 					pos.x = bat_left.x + bat_left.width + BALL_RADIUS + 1
 				}
@@ -150,7 +167,8 @@ main :: proc() {
 				if lives > 0 {
 					lives -= 1
 					pos = {WIDTH / 2, HEIGHT / 2}
-					dir = {100, 0}
+					dir = {BALL_SPEED_X, 0}
+					ball_speed_change = BALL_SPEED_Y
 				}
 				else {
 					dir = {0, 0}
