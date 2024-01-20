@@ -79,8 +79,10 @@ main :: proc() {
 			rl.ClearBackground({BG, BG, BG, 0xff})
 
 			if game_over {
-				rl.DrawText("GAME OVER", WIDTH / 2 - STRLEN_GAMEOVER, HEIGHT / 2 - 30, 32, rl.BLUE)
-				rl.DrawText("Press Space to play again", WIDTH / 2 - STRLEN_PLAYAGAIN, HEIGHT / 2 + 20, 20, rl.BLUE)
+				rl.DrawText("GAME OVER", WIDTH / 2 - STRLEN_GAMEOVER, HEIGHT / 2 - 40, 32, rl.BLUE)
+				str_score = fmt.tprintf("Score: %d", score)
+				rl.DrawText(strings.unsafe_string_to_cstring(str_score), WIDTH / 2 - STRLEN_SCORE, HEIGHT / 2, 24, rl.BLUE)
+				rl.DrawText("Press Space to play again", WIDTH / 2 - STRLEN_PLAYAGAIN, HEIGHT / 2 + 50, 20, rl.BLUE)
 
 				if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
 					pos = {WIDTH / 2, HEIGHT / 2}
