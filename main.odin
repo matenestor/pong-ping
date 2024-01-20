@@ -5,8 +5,6 @@ import "core:strings"
 import "core:time"
 import rl "vendor:raylib"
 
-// TODO increase bat speed randomly on hit?
-
 FPS :: 60
 WIDTH :: 800
 HEIGHT :: 500
@@ -130,6 +128,10 @@ main :: proc() {
 					// side collision correction
 					pos.x = bat_right.x - BALL_RADIUS - 1
 
+					if dir_bat_right.y < 300 && rl.GetRandomValue(0, 2) == 0 {
+						dir_bat_right.y *= 1.1
+					}
+
 					// NOTE: It is also possible to calculate the corrected postion like
 					// this, maybe it's more intuitive, but it requires more operations:
 					//   pos.x -= BALL_RADIUS - abs(pos.x - bat_right.x) + 1
@@ -164,6 +166,10 @@ main :: proc() {
 					dir.x *= -1
 					momentum = BALL_SPEED_X
 					pos.x = bat_left.x + bat_left.width + BALL_RADIUS + 1
+
+					if dir_bat_left.y < 300 && rl.GetRandomValue(0, 2) == 0 {
+						dir_bat_left.y *= 1.1
+					}
 				}
 				else {
 					dir.y *= -1
