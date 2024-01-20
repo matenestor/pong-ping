@@ -2,6 +2,7 @@ package pongping
 
 import "core:fmt"
 import "core:strings"
+import "core:time"
 import rl "vendor:raylib"
 
 // TODO increase bat speed randomly on hit?
@@ -24,13 +25,21 @@ sign :: #force_inline proc(num: f32) -> f32 {
 	return num / abs(num)
 }
 
-// TODO refactor to procs
+get_random_sign :: proc() -> f32 {
+	return rl.GetRandomValue(1, 2) == 1 ? 1 : -1
+}
+
+// FIXME refactor to procs
 main :: proc() {
-	// TODO create one entity struct for the ball and the bats
+	rl.SetRandomSeed(u32(time.time_to_unix(time.now())))
+
+	// FIXME create one entity struct for the ball and the bats
 	// ball
 	pos: rl.Vector2 = {WIDTH / 2, HEIGHT / 2}
-	// TODO start with random direction (y: +-angle)
-	dir: rl.Vector2 = {BALL_SPEED_X, 0}
+	dir: rl.Vector2 = {
+		get_random_sign() * BALL_SPEED_X,
+		f32(rl.GetRandomValue(-BALL_SPEED_X, BALL_SPEED_X))
+	}
 
 	// bats
 	bat_left := rl.Rectangle{
@@ -57,8 +66,9 @@ main :: proc() {
 
 	rl.InitWindow(WIDTH, HEIGHT, "Pong Ping game")
 	rl.SetTargetFPS(FPS)
-	// my Escape is remaped to CapsLock, but Raylib ignores it
-	rl.SetExitKey(rl.KeyboardKey.CAPS_LOCK)
+	// Raylib uses Escape as a default exit key, but my Escape is remaped to
+	// CapsLock and Raylib ignores it. So use Q.
+	rl.SetExitKey(rl.KeyboardKey.Q)
 
 	STRLEN_GAMEOVER := rl.MeasureText("GAME OVER", 32) / 2
 	STRLEN_PLAYAGAIN := rl.MeasureText("Press Space to play again", 20) / 2
@@ -172,7 +182,10 @@ main :: proc() {
 				if lives > 0 {
 					lives -= 1
 					pos = {WIDTH / 2, HEIGHT / 2}
-					dir = {BALL_SPEED_X, 0}
+					dir = {
+						get_random_sign() * BALL_SPEED_X,
+						f32(rl.GetRandomValue(-BALL_SPEED_X, BALL_SPEED_X))
+					}
 					ball_speed_change = BALL_SPEED_Y
 					momentum = -0.1
 				}
