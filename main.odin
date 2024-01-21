@@ -1,5 +1,7 @@
 package pongping
 
+// TODO bounce bats on hit
+
 import "core:fmt"
 import "core:strings"
 import "core:time"
@@ -10,14 +12,29 @@ WIDTH :: 800
 HEIGHT :: 500
 BG :: 0x20
 
-BAT_W :: 20
-BAT_H :: 100
+BAT_WIDTH :: 20
+BAT_HALF :: BAT_WIDTH / 2
+BAT_HEIGHT :: 100
 BAT_SPEED :: 100
 BAT_OFFSET :: 0.03
 BALL_SPEED_X :: 100
 BALL_SPEED_Y :: 3
 BALL_RADIUS :: 10
 BALL_TOP_SPEED :: 600
+
+Ball :: struct {
+	pos: rl.Vector2,
+	dir: rl.Vector2,
+	turning_speed: f32,
+	momentum: f32,
+}
+
+BatType :: enum { LEFT, RIGHT }
+
+Bat :: struct {
+	pos: rl.Rectangle,
+	dir: rl.Vector2,
+}
 
 sign :: #force_inline proc(num: f32) -> f32 {
 	return num / abs(num)
@@ -27,40 +44,116 @@ get_random_sign :: proc() -> f32 {
 	return rl.GetRandomValue(1, 2) == 1 ? 1 : -1
 }
 
-// FIXME refactor to procs
+init_ball :: proc() -> Ball {
+	return Ball{
+		rl.Vector2{WIDTH / 2, HEIGHT / 2},
+		rl.Vector2{
+			get_random_sign() * BALL_SPEED_X,
+			f32(rl.GetRandomValue(-BALL_SPEED_X, BALL_SPEED_X)),
+		},
+		BALL_SPEED_Y,
+		-1,  // not 0, because of the division in sign()
+	}
+}
+
+init_bat :: proc(bat_type: BatType) -> Bat {
+	x, y, dir: f32 = 0, 0, 0
+
+	if bat_type == .LEFT {
+		x = WIDTH * BAT_OFFSET
+		y = HEIGHT * BAT_OFFSET
+		dir = 1
+	}
+	else if bat_type == .RIGHT {
+		x = WIDTH * (1 - BAT_OFFSET) - BAT_WIDTH
+		y = HEIGHT * (1 - BAT_OFFSET) - BAT_HEIGHT
+		dir = -1
+	}
+
+	return Bat{
+		rl.Rectangle{x, y, BAT_WIDTH, BAT_HEIGHT},
+		rl.Vector2{0, BAT_SPEED * dir}
+	}
+}
+
+is_ball_and_wall_colliding :: proc(ball: ^Ball) -> bool {
+	return ball^.pos.y - BALL_RADIUS < 0 || ball^.pos.y + BALL_RADIUS > HEIGHT
+}
+
+is_ball_and_edge_colliding :: proc(ball: ^Ball) -> bool {
+	return ball^.pos.x < 0 || ball^.pos.x > WIDTH
+}
+
+is_bat_and_wall_colliding :: proc(bat: ^Bat) -> bool {
+	return bat^.pos.y < 0 || bat^.pos.y > (HEIGHT - BAT_HEIGHT)
+}
+
+is_safe_collision :: proc(ball: ^Ball, bat_edge: f32) -> bool {
+	return abs(ball^.pos.x - WIDTH / 2) < abs(bat_edge - WIDTH / 2)
+}
+
+ball_and_bat_collision :: proc(ball: ^Ball, bat: ^Bat) -> bool {
+	// NOTE: It is also possible to calculate the corrected postion like
+	// this, maybe it's more intuitive, but it requires more operations:
+	//   ball^.pos.x -= BALL_RADIUS - abs(ball^.pos.x - bat^.pos.x) + 1
+	//
+	// The same with pos.y on a bad collision:
+	//   top: ball^.pos.y -= BALL_RADIUS - abs(ball^.pos.y - bat^.pos.y) + 1
+	//   btm: ball^.pos.y += BALL_RADIUS - abs(ball^.pos.y - (bat^.pos.y + bat^.pos.height)) + 1
+
+	// -1 because the bat's edge is towards the ball's direction
+	sign := sign(ball^.dir.x) * -1
+
+	bat_middle := bat^.pos.x + BAT_HALF
+	bat_edge := bat_middle + sign * BAT_HALF
+
+	if is_safe_collision(ball, bat_edge) {
+		ball^.dir.x *= -1
+		ball^.momentum = BALL_SPEED_X
+
+		// side collision correction (-1 to avoid clipping)
+		ball^.pos.x = bat_middle + sign * (BAT_HALF + BALL_RADIUS) - 1
+
+		// 33 % chance to increase the bat speed
+		if bat^.dir.y < 300 && rl.GetRandomValue(0, 2) == 0 {
+			bat^.dir.y *= 1.1
+		}
+
+		return true
+	}
+	else {
+		ball^.dir.y *= -1
+
+		if ball^.pos.y < bat^.pos.y {
+			// top collision correction
+			ball^.pos.y = bat^.pos.y - BALL_RADIUS - 1
+		}
+		else {
+			// bottom collision correction
+			ball^.pos.y = bat^.pos.y + bat^.pos.height + BALL_RADIUS + 1
+		}
+
+		return false
+	}
+}
+
+stop_movement :: proc(element: ^$T) {
+	element^.dir.x = 0
+	element^.dir.y = 0
+}
+
 main :: proc() {
 	rl.SetRandomSeed(u32(time.time_to_unix(time.now())))
 
-	// FIXME create one entity struct for the ball and the bats
-	// ball
-	pos: rl.Vector2 = {WIDTH / 2, HEIGHT / 2}
-	dir: rl.Vector2 = {
-		get_random_sign() * BALL_SPEED_X,
-		f32(rl.GetRandomValue(-BALL_SPEED_X, BALL_SPEED_X))
-	}
-
-	// bats
-	bat_left := rl.Rectangle{
-		WIDTH * BAT_OFFSET,
-		HEIGHT * BAT_OFFSET,
-		BAT_W,
-		BAT_H
-	}
-	bat_right := rl.Rectangle{
-		WIDTH * (1 - BAT_OFFSET) - BAT_W,
-		HEIGHT * (1 - BAT_OFFSET) - BAT_H,
-		BAT_W,
-		BAT_H
-	}
-	dir_bat_left := rl.Vector2{0, BAT_SPEED}
-	dir_bat_right := rl.Vector2{0, BAT_SPEED * -1}
+	ball := init_ball()
+	bat_left := init_bat(BatType.LEFT)
+	bat_right := init_bat(BatType.RIGHT)
 
 	dt: f32 = 0
 	lives, score: int = 3, 0
-	ball_speed_change: f32 = BALL_SPEED_Y
-	momentum: f32 = -0.1  // not 0, because of the division in sign()
 	str_lives, str_score := "", ""
 	game_over := false
+	collided_ok := false
 
 	rl.InitWindow(WIDTH, HEIGHT, "Pong Ping game")
 	rl.SetTargetFPS(FPS)
@@ -85,13 +178,12 @@ main :: proc() {
 				rl.DrawText("Press Space to play again", WIDTH / 2 - STRLEN_PLAYAGAIN, HEIGHT / 2 + 50, 20, rl.BLUE)
 
 				if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
-					pos = {WIDTH / 2, HEIGHT / 2}
-					dir = {BALL_SPEED_X, 0}
-					dir_bat_left = {0, BAT_SPEED}
-					dir_bat_right = {0, BAT_SPEED * -1}
-					ball_speed_change = BALL_SPEED_Y
 					lives = 3
 					game_over = false
+
+					ball = init_ball()
+					bat_left = init_bat(BatType.LEFT)
+					bat_right = init_bat(BatType.RIGHT)
 				}
 
 				rl.EndDrawing()
@@ -100,123 +192,64 @@ main :: proc() {
 
 			// getting input
 			if rl.IsKeyDown(rl.KeyboardKey.J) || rl.IsKeyDown(rl.KeyboardKey.S) {
-				dir.y += ball_speed_change
+				ball.dir.y += ball.turning_speed
 			}
 			else if rl.IsKeyDown(rl.KeyboardKey.K) || rl.IsKeyDown(rl.KeyboardKey.W) {
-				dir.y -= ball_speed_change
+				ball.dir.y -= ball.turning_speed
 			}
-			if abs(dir.y) > BALL_TOP_SPEED {
-				dir.y = sign(dir.y) * BALL_TOP_SPEED
+			if abs(ball.dir.y) > BALL_TOP_SPEED {
+				// clamp the Y speed
+				ball.dir.y = sign(ball.dir.y) * BALL_TOP_SPEED
 			}
 
 			// out of bounds checks on y-axis for the ball and the bats
-			if pos.y - BALL_RADIUS < 0 || pos.y + BALL_RADIUS > HEIGHT { dir.y *= -1 }
-			if bat_left.y  < 0 || bat_left.y  > (HEIGHT - BAT_H) { dir_bat_left.y *= -1 }
-			if bat_right.y < 0 || bat_right.y > (HEIGHT - BAT_H) { dir_bat_right.y *= -1 }
+			if is_ball_and_wall_colliding(&ball)     do ball.dir.y *= -1
+			if is_bat_and_wall_colliding(&bat_left)  do bat_left.dir.y *= -1
+			if is_bat_and_wall_colliding(&bat_right) do bat_right.dir.y *= -1
 
 			// ball and bat collision
-			if rl.CheckCollisionCircleRec(pos, BALL_RADIUS, bat_right) {
-				if pos.x < bat_right.x {
-					score += 100
-
-					// increase the ball speed every second hit
-					if score % 200 == 0 {
-						dir.x += 20
-						ball_speed_change += 1
-					}
-
-					dir.x *= -1
-					momentum = BALL_SPEED_X
-					// side collision correction
-					pos.x = bat_right.x - BALL_RADIUS - 1
-
-					if dir_bat_right.y < 300 && rl.GetRandomValue(0, 2) == 0 {
-						dir_bat_right.y *= 1.1
-					}
-
-					// NOTE: It is also possible to calculate the corrected postion like
-					// this, maybe it's more intuitive, but it requires more operations:
-					//   pos.x -= BALL_RADIUS - abs(pos.x - bat_right.x) + 1
-					//
-					// The same with pos.y:
-					//   top: pos.y -= BALL_RADIUS - abs(pos.y - bat_right.y) + 1
-					//   btm: pos.y += BALL_RADIUS - abs(pos.y - (bat_right.y + bat_right.height)) + 1
-				}
-				else {
-					dir.y *= -1
-
-					if pos.y < bat_right.y {
-						// top collision correction
-						pos.y = bat_right.y - BALL_RADIUS - 1
-					}
-					else {
-						// bottom collision correction
-						pos.y = bat_right.y + bat_right.height + BALL_RADIUS + 1
-					}
-				}
+			collided_ok = false
+			if rl.CheckCollisionCircleRec(ball.pos, BALL_RADIUS, bat_right.pos) {
+				collided_ok = ball_and_bat_collision(&ball, &bat_right)
 			}
-			else if rl.CheckCollisionCircleRec(pos, BALL_RADIUS, bat_left) {
-				if pos.x > bat_left.x + bat_left.width {
-					score += 100
+			else if rl.CheckCollisionCircleRec(ball.pos, BALL_RADIUS, bat_left.pos) {
+				collided_ok = ball_and_bat_collision(&ball, &bat_left)
+			}
+			if collided_ok {
+				score += 100
 
-					// increase the ball speed every second hit
-					if score % 200 == 0 {
-						dir.x -= 20
-						ball_speed_change += 1
-					}
-
-					dir.x *= -1
-					momentum = BALL_SPEED_X
-					pos.x = bat_left.x + bat_left.width + BALL_RADIUS + 1
-
-					if dir_bat_left.y < 300 && rl.GetRandomValue(0, 2) == 0 {
-						dir_bat_left.y *= 1.1
-					}
-				}
-				else {
-					dir.y *= -1
-
-					if pos.y < bat_left.y {
-						pos.y = bat_left.y - BALL_RADIUS - 1
-					}
-					else {
-						pos.y = bat_left.y + bat_left.height + BALL_RADIUS + 1
-					}
+				// increase the ball speed every second hit
+				if score % 200 == 0 {
+					ball.dir.x += sign(ball.dir.x) * 20
+					ball.turning_speed += 1
 				}
 			}
 
 			// ball and the edge collision
-			if pos.x < 0 || pos.x > WIDTH {
+			if is_ball_and_edge_colliding(&ball) {
 				if lives > 0 {
 					lives -= 1
-					pos = {WIDTH / 2, HEIGHT / 2}
-					dir = {
-						get_random_sign() * BALL_SPEED_X,
-						f32(rl.GetRandomValue(-BALL_SPEED_X, BALL_SPEED_X))
-					}
-					ball_speed_change = BALL_SPEED_Y
-					momentum = -0.1
+					ball = init_ball()
 				}
 				else {
-					dir = {0, 0}
-					dir_bat_left = {0, 0}
-					dir_bat_right = {0, 0}
 					game_over = true
+					stop_movement(&ball)
+					stop_movement(&bat_left)
+					stop_movement(&bat_right)
 				}
 			}
 
-
 			// update physics
-			if momentum > 0 do momentum -= 2 * BALL_SPEED_X * dt
-			pos.x += (dir.x + sign(dir.x) * momentum) * dt
-			pos.y += dir.y * dt
-			bat_left.y += dir_bat_left.y * dt
-			bat_right.y += dir_bat_right.y * dt
+			if ball.momentum > 0 do ball.momentum -= 2 * BALL_SPEED_X * dt
+			ball.pos.x += (ball.dir.x + sign(ball.dir.x) * ball.momentum) * dt
+			ball.pos.y += ball.dir.y * dt
+			bat_left.pos.y += bat_left.dir.y * dt
+			bat_right.pos.y += bat_right.dir.y * dt
 
 			// rendering
-			rl.DrawCircleV(pos, BALL_RADIUS, rl.RAYWHITE)
-			rl.DrawRectangleRec(bat_left, rl.RAYWHITE)
-			rl.DrawRectangleRec(bat_right, rl.RAYWHITE)
+			rl.DrawCircleV(ball.pos, BALL_RADIUS, rl.RAYWHITE)
+			rl.DrawRectangleRec(bat_left.pos, rl.RAYWHITE)
+			rl.DrawRectangleRec(bat_right.pos, rl.RAYWHITE)
 
 			// draw text
 			str_lives = fmt.tprintf("Lives: %d", lives)
